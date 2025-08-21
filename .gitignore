@@ -1,0 +1,12 @@
+# Backend
+back/node_modules/
+back/logs/
+back/.env
+.env
+**/.env
+*.env
+
+# Frontend
+/front/.env.example
+/front/node_modules/
+/front/dist/
