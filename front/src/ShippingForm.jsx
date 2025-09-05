@@ -9,6 +9,7 @@ function ShippingForm({ onBack }) {
   const [lastSearched, setLastSearched] = useState(""); // Последний введенный серийный номер
   const [msg, setMsg] = useState(null); // Сообщения об ошибках/успехах
   const [busy, setBusy] = useState(false); // Индикатор загрузки
+  const [stageId, setStageId] = useState("DT177_11:UC_6QN2CY"); // по умолчанию «отправлено в офис»
 
   // Функция для поиска прибора по серийному номеру
   async function lookup() {
@@ -61,14 +62,9 @@ function ShippingForm({ onBack }) {
     setBusy(true);
     setMsg(null); // Очищаем сообщение перед отправкой данных
 
-    const payload = {};
-
-    // Отправляем itemId, если прибор был найден, или serial, если прибор не был найден
-    if (item?.id) {
-      payload.itemId = item.id; // Отправляем ID прибора, если он найден
-    } else if (serial.trim()) {
-      payload.serial = serial; // Отправляем серийный номер
-    }
+    const payload = { stageId };
+    if (item?.id) payload.itemId = item.id;
+    else if (serial.trim()) payload.serial = serial.trim();
 
     try {
       // Отправляем запрос на изменение стадии
@@ -142,8 +138,24 @@ function ShippingForm({ onBack }) {
               </span>
             )}
           </div>
+          <div className="grid sm:grid-cols-12 gap-3 items-center">
+            <div className="sm:col-span-4 label">Стадия</div>
+            <div className="sm:col-span-8">
+              <select
+                className="input"
+                value={stageId}
+                onChange={(e) => setStageId(e.target.value)}
+              >
+                <option value="DT177_11:CLIENT">Возвращено в офис</option>
+                <option value="DT177_11:UC_6QN2CY">Отправлено в офис</option>
+                <option value="DT177_11:UC_A451TG">
+                  Отправлено в СЦ (Алмата)
+                </option>
+              </select>
+            </div>
+          </div>
           <button className="btn" onClick={submit} disabled={busy}>
-            Перевести на стадию «ОТПРАВЛЕНО В ФИЛИАЛ»
+            Перевести на выбранную стадию
           </button>
         </div>
       </div>

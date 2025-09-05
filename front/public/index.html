@@ -6,7 +6,7 @@
     <title>B24 Frontend — Webpack HMR</title>
     <script>
       // Удобный способ задать адрес бэка без пересборки
-      window.__API_BASE__ = "https://3b01ed1b4b39.ngrok-free.app/form_geokurs";
+      window.__API_BASE__ = `${location.protocol}//${location.hostname}:8080/form_geokurs`;
     </script>
   </head>
   <body class="bg-slate-50">

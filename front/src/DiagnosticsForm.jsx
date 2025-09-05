@@ -1,22 +1,22 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { http } from "./config"; // Импортируем функцию http
-import ProductSearch from "./components/ProductSearch.jsx"; // Импортируем компонент для поиска приборов
+import { http } from "./config";
+import ProductSearch from "./components/ProductSearch.jsx";
 import SelectedList from "./components/SelectedList.jsx";
 import CatalogList from "./components/CatalogList.jsx";
 
-// Форма диагностики
 function DiagnosticsForm({ onBack }) {
-  const [serial, setSerial] = useState(""); // Серийный номер
-  const [item, setItem] = useState(null); // Найденный прибор
-  const [defects, setDefects] = useState(""); // Выявленные неисправности
-  const [verification, setVerification] = useState(false); // Поверка
-  const [parts, setParts] = useState([]); // Выбранные запчасти
-  const [services, setServices] = useState([]); // Выбранные услуги
-  const [lastSearched, setLastSearched] = useState(""); // Последний введенный серийный номер
-  const [msg, setMsg] = useState(null); // Сообщение об ошибках/успехах
+  const [serial, setSerial] = useState("");
+  const [item, setItem] = useState(null);
+  const [defects, setDefects] = useState("");
+  const [verification, setVerification] = useState(false);
+  const [parts, setParts] = useState([]);
+  const [services, setServices] = useState([]);
+  const [lastSearched, setLastSearched] = useState("");
+  const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  const deviceName = item?.name || "—"; // Название прибора
+  const deviceName = item?.name || "—";
+
   const sumServices = useMemo(
     () =>
       services.reduce(
@@ -24,9 +24,20 @@ function DiagnosticsForm({ onBack }) {
         0
       ),
     [services]
-  ); // Сумма услуг
+  );
 
-  // Функция поиска прибора по серийному номеру
+  const sumParts = useMemo(
+    () =>
+      parts.reduce((s, p) => s + Number(p.price || 0) * Number(p.qty || 1), 0),
+    [parts]
+  );
+
+  const totalSum = useMemo(
+    () => sumServices + sumParts,
+    [sumServices, sumParts]
+  );
+
+  // Поиск прибора по серийному (ручной)
   async function lookup() {
     setMsg(null);
     if (!serial.trim()) return;
@@ -35,16 +46,16 @@ function DiagnosticsForm({ onBack }) {
         "GET",
         `/api/device/by-serial/${encodeURIComponent(serial.trim())}`
       );
-      setItem(it); // Сохраняем найденный прибор
+      setItem(it);
       setMsg(null);
       setLastSearched(serial.trim());
-    } catch (e) {
+    } catch {
       setItem(null);
-      setMsg({ t: "warn", text: "Прибор не найден" }); // Показываем сообщение об ошибке
+      setMsg({ t: "warn", text: "Прибор не найден" });
     }
   }
 
-  // Дебаунсинг для поиска прибора
+  // Дебаунс-поиск при вводе
   useEffect(() => {
     const s = serial.trim();
     if (!s || s === lastSearched) return;
@@ -54,18 +65,28 @@ function DiagnosticsForm({ onBack }) {
           "GET",
           `/api/device/by-serial/${encodeURIComponent(s)}`
         );
-        setItem(it); // Сохраняем найденный прибор
+        setItem(it);
         setMsg(null);
-        setLastSearched(s); // Обновляем последний введенный серийный номер
-      } catch (e) {
+        setLastSearched(s);
+      } catch {
         setItem(null);
-        setMsg({ t: "warn", text: "Прибор не найден" }); // Показываем сообщение об ошибке
+        setMsg({ t: "warn", text: "Прибор не найден" });
       }
     }, 400);
-    return () => clearTimeout(h); // Очистка таймера
+    return () => clearTimeout(h);
   }, [serial, lastSearched]);
 
-  // Функция отправки данных на сервер
+  // ---- helpers для локальной корзины (без API) ----
+  const upsertWithPlusOne = (list, entry) => {
+    const id = Number(entry.id);
+    const idx = list.findIndex((x) => Number(x.id) === id);
+    if (idx === -1) return [...list, { ...entry, qty: 1 }];
+    const copy = list.slice();
+    copy[idx] = { ...copy[idx], qty: Number(copy[idx].qty || 1) + 1 };
+    return copy;
+  };
+
+  // ---- отправка формы (единственный POST) ----
   async function submit() {
     if (!item?.id) {
       setMsg({ t: "warn", text: "Сначала найдите прибор" });
@@ -79,16 +100,26 @@ function DiagnosticsForm({ onBack }) {
       serial,
       defects,
       verification,
-      parts,
-      services,
+      parts: parts.map((p) => ({
+        id: p.id,
+        price: Number(p.price || 0),
+        qty: Number(p.qty || 1),
+      })),
+      services: services.map((s) => ({
+        id: s.id,
+        name: s.name,
+        price: Number(s.price || 0),
+        qty: Number(s.qty || 1),
+      })),
     };
 
     try {
-      const response = await http("POST", "/api/diagnostics", payload);
+      const res = await http("POST", "/api/diagnostics", payload);
+      if (!res?.ok && res?.error) throw new Error(res.error);
       setMsg({ t: "ok", text: "Диагностика сохранена. Обновляем страницу…" });
-      setTimeout(() => window.location.reload(), 1000); // Перезагружаем страницу
+      setTimeout(() => window.location.reload(), 900);
     } catch (e) {
-      setMsg({ t: "err", text: e.message }); // Показываем ошибку
+      setMsg({ t: "err", text: e.message || "Ошибка сохранения" });
     } finally {
       setBusy(false);
     }
@@ -112,7 +143,7 @@ function DiagnosticsForm({ onBack }) {
           }}
         />
 
-        {/* Выводим название прибора */}
+        {/* Название прибора */}
         <div className="grid sm:grid-cols-12 gap-3 items-center">
           <div className="sm:col-span-4 label">Название прибора</div>
           <div className="sm:col-span-8">
@@ -123,14 +154,14 @@ function DiagnosticsForm({ onBack }) {
 
         <div className="border-t" />
 
-        {/* Поле для выявленных неисправностей */}
+        {/* Неисправности */}
         <div className="grid sm:grid-cols-12 gap-3">
           <div className="sm:col-span-4 label">Выявленные неисправности</div>
           <div className="sm:col-span-8">
             <textarea
               className="textarea"
               value={defects}
-              onChange={(e) => setDefects(e.target.value)} // Обновляем неисправности
+              onChange={(e) => setDefects(e.target.value)}
               placeholder="Опишите неисправности"
             />
           </div>
@@ -144,7 +175,7 @@ function DiagnosticsForm({ onBack }) {
               id="verif"
               type="checkbox"
               checked={verification}
-              onChange={(e) => setVerification(e.target.checked)} // Обновляем состояние поверки
+              onChange={(e) => setVerification(e.target.checked)}
             />
             <label htmlFor="verif" className="text-sm">
               Да
@@ -154,71 +185,29 @@ function DiagnosticsForm({ onBack }) {
 
         <div className="border-t" />
 
-        {/* Каталоги запчастей и услуг */}
+        {/* Каталоги */}
         <div className="grid sm:grid-cols-2 gap-4">
           <CatalogList
             title="Каталог: Запчасти"
             sectionIds={[653]}
-            onSelect={async (part) => {
-              const withQty = { ...part, qty: 1 };
-              setParts((prev) => [...prev, withQty]);
-              try {
-                if (item?.id) {
-                  const spaRows = [
-                    ...parts.map((p) => ({
-                      productId: Number(p.id),
-                      price: Number(p.price || 0),
-                      quantity: Number(p.qty || 1),
-                    })),
-                    {
-                      productId: Number(withQty.id),
-                      price: Number(withQty.price || 0),
-                      quantity: 1,
-                    },
-                  ];
-                  await http(
-                    "POST",
-                    `/api/item/${encodeURIComponent(item.id)}/productrows/set`,
-                    { rows: spaRows }
-                  );
-                }
-                setMsg({ t: "ok", text: "Запчасть добавлена в прибор" });
-              } catch (e) {
-                setMsg({ t: "err", text: e.message });
-              }
+            onSelect={(part) => {
+              // ТОЛЬКО локальный стейт, без API
+              setParts((prev) => upsertWithPlusOne(prev, part));
+              setMsg({ t: "ok", text: "Запчасть добавлена" });
             }}
           />
           <CatalogList
             title="Каталог: Услуги"
             sectionIds={[654]}
-            onSelect={async (service) => {
-              if (!item?.dealId) {
-                setMsg({ t: "warn", text: "У выбранного прибора нет сделки" });
-                return;
-              }
-              try {
-                setMsg(null);
-                await http(
-                  "POST",
-                  `/api/deal/${encodeURIComponent(
-                    item.dealId
-                  )}/productrows/add`,
-                  {
-                    productId: Number(service.id),
-                    price: Number(service.price || 0),
-                    quantity: 1,
-                  }
-                );
-                setServices((prev) => [...prev, { ...service, qty: 1 }]);
-                setMsg({ t: "ok", text: "Услуга добавлена в сделку" });
-              } catch (e) {
-                setMsg({ t: "err", text: e.message });
-              }
+            onSelect={(service) => {
+              // ТОЛЬКО локальный стейт, без API
+              setServices((prev) => upsertWithPlusOne(prev, service));
+              setMsg({ t: "ok", text: "Услуга добавлена" });
             }}
           />
         </div>
 
-        {/* Списки выбранных запчастей и услуг */}
+        {/* Выбранные позиции */}
         <div className="grid sm:grid-cols-2 gap-4">
           <SelectedList
             title="Выбраны запчасти"
@@ -228,7 +217,9 @@ function DiagnosticsForm({ onBack }) {
             }
             onQtyChange={(i, qty) =>
               setParts((prev) =>
-                prev.map((x, idx) => (idx === i ? { ...x, qty } : x))
+                prev.map((x, idx) =>
+                  idx === i ? { ...x, qty: Math.max(1, Number(qty || 1)) } : x
+                )
               )
             }
           />
@@ -238,42 +229,44 @@ function DiagnosticsForm({ onBack }) {
             onRemove={(i) =>
               setServices((prev) => prev.filter((_, idx) => idx !== i))
             }
-            onQtyChange={async (i, qty) => {
+            onQtyChange={(i, qty) =>
               setServices((prev) =>
-                prev.map((x, idx) => (idx === i ? { ...x, qty } : x))
-              );
-              try {
-                if (item?.dealId) {
-                  const rows = services.map((s, idx) => ({
-                    productId: Number(s.id),
-                    price: Number(s.price || 0),
-                    quantity: Number(idx === i ? qty : s.qty || 1),
-                  }));
-                  await http(
-                    "POST",
-                    `/api/deal/${encodeURIComponent(
-                      item.dealId
-                    )}/productrows/set`,
-                    { rows }
-                  );
-                }
-                setMsg({ t: "ok", text: "Количество обновлено" });
-              } catch (e) {
-                setMsg({ t: "err", text: e.message });
-              }
-            }}
+                prev.map((x, idx) =>
+                  idx === i ? { ...x, qty: Math.max(1, Number(qty || 1)) } : x
+                )
+              )
+            }
           />
         </div>
 
-        {/* Сумма за услуги */}
+        {/* Суммы */}
         <div className="grid sm:grid-cols-12 gap-3 items-center">
-          <div className="sm:col-span-4 label">Сумма услуг (авто)</div>
-          <div className="sm:col-span-8 font-semibold">
+          <div className="sm:col-span-4 label">Сумма услуг</div>
+          <div className="sm:col-span-8">
             {new Intl.NumberFormat(undefined, {
               style: "currency",
               currency: "KZT",
-            }).format(sumServices)}{" "}
-            {/* Отображаем сумму услуг в KZT */}
+            }).format(sumServices)}
+          </div>
+        </div>
+
+        <div className="grid sm:grid-cols-12 gap-3 items-center">
+          <div className="sm:col-span-4 label">Сумма запчастей</div>
+          <div className="sm:col-span-8">
+            {new Intl.NumberFormat(undefined, {
+              style: "currency",
+              currency: "KZT",
+            }).format(sumParts)}
+          </div>
+        </div>
+
+        <div className="grid sm:grid-cols-12 gap-3 items-center border-t pt-2">
+          <div className="sm:col-span-4 label">ИТОГО</div>
+          <div className="sm:col-span-8 font-semibold text-lg">
+            {new Intl.NumberFormat(undefined, {
+              style: "currency",
+              currency: "KZT",
+            }).format(totalSum)}
           </div>
         </div>
 

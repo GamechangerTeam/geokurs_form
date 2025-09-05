@@ -240,32 +240,22 @@ router.post("/api/diagnostics", async (req, res) => {
 // ===== shipping (move to SENT) =====
 router.post("/api/ship", async (req, res) => {
   try {
-    const { serial, itemId } = req.body || {};
+    const { itemId, serial, stageId } = req.body || {};
+    if (!stageId) return res.status(400).json({ ok: false, error: "NO_STAGE" });
+
     let id = itemId;
-
     if (!id && serial) {
-      const items = await findItemsBySerial(String(serial).trim());
-      const first = Array.isArray(items) ? items[0] : items;
-      if (!first?.id)
-        return res.status(404).json({ ok: false, error: "NOT_FOUND" });
-      id = first.id;
+      const items = await findItemsBySerial(serial);
+      if (!items?.length)
+        return res.status(404).json({ ok: false, error: "ITEM_NOT_FOUND" });
+      id = items[0].id;
     }
+    if (!id) return res.status(400).json({ ok: false, error: "NO_ITEM" });
 
-    if (!id)
-      return res
-        .status(400)
-        .json({ ok: false, error: "itemId or serial is required" });
-
-    await moveItemToStage(id, CONFIG.STAGES.SENT);
-    logMessage(
-      globalThis.LOG_TYPES?.I || "info",
-      "POST /api/ship",
-      `itemId=${id} -> ${CONFIG.STAGES.SENT}`
-    );
-    res.json({ ok: true, itemId: id, stageId: CONFIG.STAGES.SENT });
+    await moveItemToStage(id, stageId);
+    return res.json({ ok: true, itemId: id, stageId });
   } catch (e) {
-    logMessage(globalThis.LOG_TYPES?.E || "error", "POST /api/ship", e);
-    res.status(400).json({ ok: false, error: e.message });
+    return res.status(500).json({ ok: false, error: e.message });
   }
 });
 

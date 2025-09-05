@@ -10,3 +10,6 @@ back/.env
 /front/.env.example
 /front/node_modules/
 /front/dist/
+
+script_video.docx
+*.zip
