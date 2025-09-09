@@ -9,7 +9,7 @@ function ShippingForm({ onBack }) {
   const [lastSearched, setLastSearched] = useState(""); // Последний введенный серийный номер
   const [msg, setMsg] = useState(null); // Сообщения об ошибках/успехах
   const [busy, setBusy] = useState(false); // Индикатор загрузки
-  const [stageId, setStageId] = useState("DT177_11:UC_6QN2CY"); // по умолчанию «отправлено в офис»
+  const [stageId, setStageId] = useState("DT177_11:UC_6QN2CY"); // по умолчанию «отправлено в филиал»
 
   // Функция для поиска прибора по серийному номеру
   async function lookup() {
@@ -147,7 +147,7 @@ function ShippingForm({ onBack }) {
                 onChange={(e) => setStageId(e.target.value)}
               >
                 <option value="DT177_11:CLIENT">Возвращено в офис</option>
-                <option value="DT177_11:UC_6QN2CY">Отправлено в офис</option>
+                <option value="DT177_11:UC_6QN2CY">Отправлено в филиал</option>
                 <option value="DT177_11:UC_A451TG">
                   Отправлено в СЦ (Алмата)
                 </option>

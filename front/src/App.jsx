@@ -38,7 +38,7 @@ export default function App() {
             <div className="card">
               <div className="text-lg font-semibold mb-1">Отправка</div>
               <div className="text-sm text-slate-600 mb-3">
-                Перевод на стадию «ОТПРАВЛЕНО В ФИЛИАЛ».
+                Перевод на стадии в воронке.
               </div>
               <button className="btn" onClick={() => setMode("ship")}>
                 Открыть
