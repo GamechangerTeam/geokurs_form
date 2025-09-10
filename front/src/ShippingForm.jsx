@@ -151,6 +151,7 @@ function ShippingForm({ onBack }) {
                 <option value="DT177_11:UC_A451TG">
                   Отправлено в СЦ (Алмата)
                 </option>
+                <option value="DT177_11:UC_1S13EN">Отправлен в Алматы</option>
               </select>
             </div>
           </div>

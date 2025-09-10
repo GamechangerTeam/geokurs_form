@@ -222,6 +222,15 @@ function DiagnosticsForm({ onBack }) {
                 )
               )
             }
+            onPriceChange={(i, price) =>
+              setParts((prev) =>
+                prev.map((x, idx) =>
+                  idx === i
+                    ? { ...x, price: Math.max(0, Number(price || 0)) }
+                    : x
+                )
+              )
+            }
           />
           <SelectedList
             title="Выбраны услуги"
@@ -233,6 +242,15 @@ function DiagnosticsForm({ onBack }) {
               setServices((prev) =>
                 prev.map((x, idx) =>
                   idx === i ? { ...x, qty: Math.max(1, Number(qty || 1)) } : x
+                )
+              )
+            }
+            onPriceChange={(i, price) =>
+              setServices((prev) =>
+                prev.map((x, idx) =>
+                  idx === i
+                    ? { ...x, price: Math.max(0, Number(price || 0)) }
+                    : x
                 )
               )
             }
