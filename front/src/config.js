@@ -39,4 +39,9 @@ const http = async (method, url, body) => {
   return res.json();
 };
 
+// front/src/api.js (или рядом, где тебе удобнее)
+export async function getCurrencies() {
+  return http("GET", "/api/currencies");
+}
+
 export { API_BASE, http }; // Экспортируем и http, и API_BASE

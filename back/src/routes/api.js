@@ -11,6 +11,7 @@ import {
   getDealProductRows,
   setDealProductRows,
   setItemProductRows,
+  listCurrencies1124,
 } from "../b24/client.js";
 import { handleDiagnostics } from "../services/diagnostics.js";
 
@@ -336,6 +337,18 @@ router.post("/api/deal/:dealId/productrows/set", async (req, res) => {
       e
     );
     res.status(400).json({ ok: false, error: e.message });
+  }
+});
+
+// === Валюты из СП 1124 (категория 0) для фронта ===
+router.get("/api/currencies", async (_req, res) => {
+  try {
+    const list = await listCurrencies1124();
+    res.json(list);
+  } catch (e) {
+    res
+      .status(500)
+      .json({ ok: false, error: "CURR_FETCH_FAILED", message: e.message });
   }
 });
 

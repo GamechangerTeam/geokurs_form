@@ -242,3 +242,118 @@ export async function getProductsFromSections(sectionIds = [653, 654]) {
 export async function moveItemToStage(itemId, stageId) {
   return updateItemFields(itemId, { stageId });
 }
+
+/* ===================== Currency helpers (add-ons) ===================== */
+// СП валют: entityTypeId=1124, categoryId=0; поле с курсом (1 единица = N тенге)
+const CURRENCY_ENTITY_TYPE_ID = 1124;
+const CURRENCY_CATEGORY_ID = 0;
+const RATE_FIELD_CODE = "ufCrm27_1757683948545";
+
+/** Валюты из смарт-процесса 1124 (категория 0) */
+export async function listCurrencies1124() {
+  try {
+    const res = await callB24("crm.item.list", {
+      entityTypeId: CURRENCY_ENTITY_TYPE_ID,
+      select: ["id", "title", RATE_FIELD_CODE],
+      order: { title: "asc" },
+    });
+    const items = Array.isArray(res?.items) ? res.items : [];
+    const mapped = items
+      .map((x) => {
+        const title = (x.title || "").trim();
+        const code = (title || String(x.id)).toUpperCase();
+        const rate = Number(x[RATE_FIELD_CODE]);
+        if (!rate) return null;
+        return { code, name: title || code, rateKZT: rate };
+      })
+      .filter(Boolean);
+    const kzt = { code: "KZT", name: "KZT (тенге)", rateKZT: 1 };
+    return [kzt, ...mapped.filter((c) => c.code !== "KZT")];
+  } catch {
+    return [{ code: "KZT", name: "KZT (тенге)", rateKZT: 1 }];
+  }
+}
+
+/** Валюты, включённые на портале (CRM → Настройки → Валюты) */
+export async function portalCurrencies() {
+  try {
+    const res = await callB24("crm.currency.list", {});
+    return Array.isArray(res) ? res : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Установить валюту сделки (CURRENCY_ID) */
+export async function setDealCurrency(dealId, currencyCode) {
+  return callB24("crm.deal.update", {
+    id: dealId,
+    fields: { CURRENCY_ID: currencyCode },
+  });
+}
+
+/**
+ * Обеспечить валюту сделки и положить productrows
+ * rows: массив «сырых» строк [{ PRODUCT_ID?|PRODUCT_NAME?, PRICE, QUANTITY, ... }]
+ * Если валюта поддерживается порталом → ставим её на сделку и на строки (без конвертации)
+ * Иначе → конвертируем в KZT по rateKZT, ставим KZT.
+ */
+export async function ensureDealCurrencyAndSetRowsRaw(
+  dealId,
+  rowsRaw,
+  { currency = "KZT", rateKZT = 1, useProductName = false } = {}
+) {
+  const list = await portalCurrencies();
+  const supported = new Set(
+    (Array.isArray(list) ? list : []).map((c) =>
+      String(c.CURRENCY || "").toUpperCase()
+    )
+  );
+
+  const raw = String(currency || "KZT");
+  let code = raw.toUpperCase();
+  if (!supported.has(code)) {
+    const n = raw.trim().toLowerCase();
+    if (n.includes("сом") || n.includes("som")) code = "KGS";
+    else if (n.includes("руб")) code = "RUB";
+    else if (n.includes("дол") || n.includes("usd") || n.includes("$"))
+      code = "USD";
+    else if (n.includes("евр") || n.includes("eur")) code = "EUR";
+    else if (n.includes("тенг") || n.includes("kzt")) code = "KZT";
+  }
+
+  const norm = (r) => {
+    const priceRaw = r.PRICE ?? r.price ?? 0;
+    const qtyRaw = r.QUANTITY ?? r.qty ?? 1;
+    const base = {
+      PRICE: Number(priceRaw) || 0,
+      QUANTITY: Number(qtyRaw) || 1,
+    };
+    if (useProductName) {
+      return {
+        ...base,
+        PRODUCT_NAME: r.PRODUCT_NAME ?? r.name ?? String(r.id),
+      };
+    }
+    return { ...base, PRODUCT_ID: r.PRODUCT_ID ?? r.id };
+  };
+
+  if (supported.has(code)) {
+    await setDealCurrency(dealId, code);
+    const rows = (rowsRaw || []).map((r) => ({
+      ...norm(r),
+      CURRENCY_ID: code,
+    }));
+    return setDealProductRows(dealId, rows);
+  }
+
+  const mul = Number(rateKZT || 1);
+  const toKzt = (v) => Math.round((Number(v) || 0) * mul * 100) / 100;
+  await setDealCurrency(dealId, "KZT");
+  const rowsKzt = (rowsRaw || []).map((r) => ({
+    ...norm(r),
+    PRICE: toKzt(r.PRICE ?? r.price),
+    CURRENCY_ID: "KZT",
+  }));
+  return setDealProductRows(dealId, rowsKzt);
+}

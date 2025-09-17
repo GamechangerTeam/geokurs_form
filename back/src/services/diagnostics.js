@@ -9,6 +9,7 @@ import {
   addDeal,
   getDealProductRows, // crm.deal.productrows.get
 } from "../b24/client.js";
+import { ensureDealCurrencyAndSetRowsRaw } from "../b24/client.js";
 
 /** Маппинг строк для смарт-процесса (SPA) */
 function toRowsForSpa(arr = []) {
@@ -107,6 +108,8 @@ export async function handleDiagnostics(payload = {}) {
     verification = false,
     parts = [],
     services = [], // из фронта: [{ id, name, price, qty }]
+    currency = "KZT",
+    rateKZT = 1,
   } = payload;
 
   if (!serial || !String(serial).trim()) {
@@ -270,7 +273,12 @@ export async function handleDiagnostics(payload = {}) {
   }
 
   // 7) Записать общий список обратно в сделку
-  await setDealProductRows(dealId, rest);
+  await ensureDealCurrencyAndSetRowsRaw(dealId, rest, {
+    currency,
+    rateKZT,
+    // поставь true, если строки создаются по названию, а не по каталогу:
+    useProductName: true, // или false, если используешь PRODUCT_ID
+  });
 
   // 8) Поля прибора: дефекты, поверка, сумма (услуги + запчасти)
   // Стоимость запчастей уже включена в стоимость ремонта, поэтому отдельно не учитываем
